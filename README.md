@@ -4,8 +4,7 @@ A terminal-based Ethereum blockchain explorer. Browse blocks, inspect transactio
 
 No API keys are required to get started. Point it at a public RPC node (or your own) and you're exploring the chain in seconds. Multi-chain support lets you switch between Ethereum, Arbitrum, Optimism, Base, and Polygon with a single flag.
 
-<img width="1312" height="617" alt="image" src="https://github.com/user-attachments/assets/0e998a27-25eb-4d14-8d58-2ca4fe2969e4" />
-
+<img width="1188" height="727" alt="image" src="https://github.com/user-attachments/assets/1e0f2b95-ec31-4b90-b18a-27a58241db37" />
 
 ## Features
 
