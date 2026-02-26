@@ -21,10 +21,51 @@ No API keys are required to get started. Point it at a public RPC node (or your 
   ```
   curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
   ```
-- Access to an Ethereum JSON-RPC endpoint (HTTP). Any of the following will work:
-  - A public endpoint like `https://eth.merkle.io` (the default)
-  - Your own node (Geth, Reth, Erigon, etc.) at `http://localhost:8545`
-  - A provider like Alchemy or Infura: `https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY`
+- Access to an Ethereum JSON-RPC endpoint (HTTP). You do **not** need to run your own node. See the next section for details.
+
+## Connecting to Ethereum Mainnet
+
+eth-tui connects to Ethereum through any standard JSON-RPC endpoint over HTTP. You do not need to run your own node. By default it uses `https://eth.merkle.io`, a free public endpoint, so running `eth-tui` with no flags will connect you to mainnet immediately.
+
+### Free Public RPC Endpoints (no account required)
+
+These are community/public endpoints that work out of the box with no signup or API key:
+
+| Provider | URL |
+|---|---|
+| Merkle (default) | `https://eth.merkle.io` |
+| CloudFlare | `https://cloudflare-eth.com` |
+| PublicNode | `https://ethereum-rpc.publicnode.com` |
+| 1RPC | `https://1rpc.io/eth` |
+| DRPC | `https://eth.drpc.org` |
+
+To use one of these alternatives:
+
+```bash
+eth-tui --rpc-url https://cloudflare-eth.com
+```
+
+Public endpoints are rate-limited and best suited for casual browsing. If you experience slow responses or errors, try a different one from the list above, or use a provider account for higher limits.
+
+### Provider Accounts (free tier, signup required)
+
+For heavier usage, services like Alchemy and Infura offer generous free tiers with higher rate limits:
+
+- **Alchemy**: `https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY` ([sign up](https://www.alchemy.com/))
+- **Infura**: `https://mainnet.infura.io/v3/YOUR_KEY` ([sign up](https://www.infura.io/))
+- **Ankr**: `https://rpc.ankr.com/eth/YOUR_KEY` ([sign up](https://www.ankr.com/))
+
+```bash
+eth-tui --rpc-url https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY
+```
+
+### Local Node
+
+If you run your own node (Geth, Reth, Erigon, Nethermind, etc.), point eth-tui at its RPC port:
+
+```bash
+eth-tui --rpc-url http://localhost:8545
+```
 
 ## Installation
 
@@ -46,22 +87,16 @@ cargo install --path .
 
 ## Quick Start
 
-Run with the default public RPC endpoint:
+Connect to Ethereum mainnet using the default public endpoint (no configuration needed):
 
 ```bash
 eth-tui
 ```
 
-Connect to a local node:
+Or specify a different RPC endpoint (see [Connecting to Ethereum Mainnet](#connecting-to-ethereum-mainnet) for a full list of options):
 
 ```bash
-eth-tui --rpc-url http://localhost:8545
-```
-
-Connect to Alchemy or Infura:
-
-```bash
-eth-tui --rpc-url https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY
+eth-tui --rpc-url https://cloudflare-eth.com
 ```
 
 ## Usage
