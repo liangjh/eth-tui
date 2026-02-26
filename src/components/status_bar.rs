@@ -9,6 +9,7 @@ pub struct StatusBar {
     pub latest_block: u64,
     pub error_message: Option<String>,
     pub loading: bool,
+    pub ws_connected: bool,
 }
 
 impl StatusBar {
@@ -18,6 +19,7 @@ impl StatusBar {
             latest_block: 0,
             error_message: None,
             loading: false,
+            ws_connected: false,
         }
     }
 
@@ -28,7 +30,7 @@ impl StatusBar {
 
         let chunks = Layout::default()
             .direction(Direction::Horizontal)
-            .constraints([Constraint::Min(0), Constraint::Length(30)])
+            .constraints([Constraint::Min(0), Constraint::Length(40)])
             .split(area);
 
         // --- Left side ---
@@ -70,16 +72,24 @@ impl StatusBar {
         let left = Paragraph::new(left_content).style(THEME.header_style());
         frame.render_widget(left, chunks[0]);
 
-        // --- Right side: connection status + block number ---
+        // --- Right side: WS status + connection status + block number ---
         let (dot_color, status_text) = if self.connected {
             (THEME.success, "Connected")
         } else {
             (THEME.error, "Disconnected")
         };
 
+        let (ws_color, ws_text) = if self.ws_connected {
+            (THEME.success, "WS")
+        } else {
+            (THEME.text_muted, "WS:--")
+        };
+
         let block_str = utils::format_number(self.latest_block);
 
         let right_content = Line::from(vec![
+            Span::styled(ws_text, Style::default().fg(ws_color)),
+            Span::styled(" | ", THEME.muted_style()),
             Span::styled("\u{25cf} ", Style::default().fg(dot_color)),
             Span::styled(status_text, Style::default().fg(dot_color)),
             Span::styled(" | ", THEME.muted_style()),

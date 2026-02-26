@@ -3,13 +3,15 @@ use ratatui::prelude::*;
 use ratatui::widgets::*;
 
 use crate::components::Component;
-use crate::data::types::{TransactionDetail, TxStatus};
+use crate::data::types::{DecodedLog, InternalCall, TransactionDetail, TxStatus};
 use crate::events::AppEvent;
 use crate::theme::THEME;
 use crate::utils;
 
 pub struct TxDetailView {
     pub detail: Option<TransactionDetail>,
+    pub internal_calls: Vec<InternalCall>,
+    pub decoded_logs: Vec<DecodedLog>,
     pub loading: bool,
     scroll: u16,
     max_scroll: u16,
@@ -19,13 +21,15 @@ impl TxDetailView {
     pub fn new() -> Self {
         Self {
             detail: None,
+            internal_calls: Vec::new(),
+            decoded_logs: Vec::new(),
             loading: false,
             scroll: 0,
             max_scroll: 0,
         }
     }
 
-    fn build_lines(detail: &TransactionDetail) -> Vec<Line<'static>> {
+    fn build_lines(&self, detail: &TransactionDetail) -> Vec<Line<'static>> {
         let mut lines: Vec<Line<'static>> = Vec::new();
         let tx = &detail.summary;
 
@@ -256,7 +260,81 @@ impl TxDetailView {
             }
         }
 
-        // ---- Section 6: Raw Input ----
+        // ---- Section 6: Internal Transactions ----
+        if !self.internal_calls.is_empty() {
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                "  Internal Transactions",
+                Style::default().fg(THEME.text).add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+            )));
+            lines.push(Line::from(""));
+
+            for call in &self.internal_calls {
+                let indent = "  ".repeat(call.depth + 1);
+                let value_str = if call.value.is_zero() {
+                    String::new()
+                } else {
+                    format!("  {}", utils::format_eth(call.value))
+                };
+                let error_str = if let Some(ref err) = call.error {
+                    format!(" [ERR: {err}]")
+                } else {
+                    String::new()
+                };
+                lines.push(Line::from(vec![
+                    Span::raw(format!("{indent}")),
+                    Span::styled(
+                        call.call_type.clone(),
+                        Style::default().fg(THEME.warning).add_modifier(Modifier::BOLD),
+                    ),
+                    Span::raw(" "),
+                    Span::styled(
+                        utils::truncate_address(&call.from),
+                        THEME.address_style(),
+                    ),
+                    Span::raw(" \u{2192} "),
+                    Span::styled(
+                        utils::truncate_address(&call.to),
+                        THEME.address_style(),
+                    ),
+                    Span::styled(value_str, THEME.eth_style()),
+                    Span::styled(error_str, THEME.error_style()),
+                ]));
+            }
+        }
+
+        // ---- Section 7: Events (Decoded Logs) ----
+        if !self.decoded_logs.is_empty() {
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                "  Events",
+                Style::default().fg(THEME.text).add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
+            )));
+            lines.push(Line::from(""));
+
+            for log in &self.decoded_logs {
+                lines.push(Line::from(vec![
+                    Span::styled(
+                        format!("  {} ", log.event_name),
+                        THEME.accent_style(),
+                    ),
+                    Span::styled(
+                        utils::truncate_address(&log.address),
+                        THEME.address_style(),
+                    ),
+                ]));
+
+                for (name, value) in &log.params {
+                    lines.push(Line::from(vec![
+                        Span::raw("      "),
+                        Span::styled(format!("{name}: "), THEME.muted_style()),
+                        Span::raw(value.clone()),
+                    ]));
+                }
+            }
+        }
+
+        // ---- Section 8: Raw Input ----
         lines.push(Line::from(""));
         lines.push(Line::from(Span::styled(
             "  Raw Input",
@@ -275,20 +353,13 @@ impl TxDetailView {
         lines.push(Line::from(Span::styled(truncated, THEME.muted_style())));
 
         lines.push(Line::from(""));
-        lines.push(Line::from(Span::styled(
-            "  Nonce: ",
-            THEME.muted_style(),
-        )));
-        // Replace last line to include nonce value
-        if let Some(last) = lines.last_mut() {
-            *last = Line::from(vec![
-                Span::styled("  Nonce:  ", THEME.muted_style()),
-                Span::raw(format!("{}", detail.nonce)),
-                Span::raw("    "),
-                Span::styled("Logs:  ", THEME.muted_style()),
-                Span::raw(format!("{}", detail.logs_count)),
-            ]);
-        }
+        lines.push(Line::from(vec![
+            Span::styled("  Nonce:  ", THEME.muted_style()),
+            Span::raw(format!("{}", detail.nonce)),
+            Span::raw("    "),
+            Span::styled("Logs:  ", THEME.muted_style()),
+            Span::raw(format!("{}", detail.logs_count)),
+        ]));
 
         lines.push(Line::from(""));
 
@@ -355,7 +426,7 @@ impl Component for TxDetailView {
             None => return,
         };
 
-        let lines = Self::build_lines(detail);
+        let lines = self.build_lines(detail);
         let total_lines = lines.len() as u16;
         self.max_scroll = total_lines.saturating_sub(inner.height);
 

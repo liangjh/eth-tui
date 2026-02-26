@@ -95,6 +95,16 @@ fn render_info_section(detail: &BlockDetail) -> Vec<Row<'static>> {
         ]),
     ];
 
+    // ETH Burned row
+    if let Some(eth_burned) = s.eth_burned {
+        rows.push(Row::new(vec![
+            Cell::from("ETH Burned").style(THEME.muted_style()),
+            Cell::from(utils::format_eth(eth_burned)).style(THEME.eth_style()),
+            Cell::from(""),
+            Cell::from(""),
+        ]));
+    }
+
     if let Some(size) = detail.size {
         rows.push(Row::new(vec![
             Cell::from("Size").style(THEME.muted_style()),
@@ -184,17 +194,29 @@ impl Component for BlockDetailView {
             None => return,
         };
 
+        // Calculate info section height based on number of rows
+        let info_row_count = {
+            let mut count = 5u16; // base rows
+            if detail.summary.eth_burned.is_some() {
+                count += 1;
+            }
+            if detail.size.is_some() {
+                count += 1;
+            }
+            count
+        };
+
         // Split the inner area: info section, gauge, transactions table
         let has_txs = !detail.transactions.is_empty();
         let constraints = if has_txs {
             vec![
-                Constraint::Length(8), // info key-value section
-                Constraint::Length(3), // gas gauge
-                Constraint::Min(6),   // transaction table
+                Constraint::Length(info_row_count), // info key-value section
+                Constraint::Length(3),               // gas gauge
+                Constraint::Min(6),                  // transaction table
             ]
         } else {
             vec![
-                Constraint::Length(8),
+                Constraint::Length(info_row_count),
                 Constraint::Length(3),
                 Constraint::Min(1),
             ]

@@ -118,6 +118,41 @@ impl HelpOverlay {
                 Span::styled("  3        ", Style::default().fg(THEME.text_accent)),
                 Span::styled("Gas Tracker", Style::default().fg(THEME.text)),
             ]),
+            Line::from(vec![
+                Span::styled("  4        ", Style::default().fg(THEME.text_accent)),
+                Span::styled("Watch List", Style::default().fg(THEME.text)),
+            ]),
+            Line::from(vec![
+                Span::styled("  5        ", Style::default().fg(THEME.text_accent)),
+                Span::styled("Mempool", Style::default().fg(THEME.text)),
+            ]),
+            Line::from(""),
+            Line::from(Span::styled(
+                "Context Actions",
+                Style::default()
+                    .fg(THEME.text_accent)
+                    .add_modifier(Modifier::BOLD),
+            )),
+            Line::from(vec![
+                Span::styled("  w        ", Style::default().fg(THEME.text_accent)),
+                Span::styled("Add to Watchlist (address view)", Style::default().fg(THEME.text)),
+            ]),
+            Line::from(vec![
+                Span::styled("  e        ", Style::default().fg(THEME.text_accent)),
+                Span::styled("Export current view data", Style::default().fg(THEME.text)),
+            ]),
+            Line::from(vec![
+                Span::styled("  r        ", Style::default().fg(THEME.text_accent)),
+                Span::styled("Contract Read (address view)", Style::default().fg(THEME.text)),
+            ]),
+            Line::from(vec![
+                Span::styled("  d        ", Style::default().fg(THEME.text_accent)),
+                Span::styled("Debug Trace (tx view)", Style::default().fg(THEME.text)),
+            ]),
+            Line::from(vec![
+                Span::styled("  S        ", Style::default().fg(THEME.text_accent)),
+                Span::styled("Storage Inspector (address view)", Style::default().fg(THEME.text)),
+            ]),
             Line::from(""),
             Line::from(Span::styled(
                 "Other",

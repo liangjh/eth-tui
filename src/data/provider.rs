@@ -2,7 +2,34 @@ use alloy::eips::BlockId;
 use alloy::primitives::{Address, Bytes, B256, U256};
 use alloy::providers::{Provider, ProviderBuilder};
 use alloy::rpc::types::{Block, BlockNumberOrTag, TransactionReceipt};
+use alloy::sol;
+use alloy::sol_types::SolCall;
 use color_eyre::eyre::Result;
+
+// Multicall3 ABI via sol! macro
+sol! {
+    #[derive(Debug)]
+    interface IMulticall3 {
+        struct Call3 {
+            address target;
+            bool allowFailure;
+            bytes callData;
+        }
+        struct Result {
+            bool success;
+            bytes returnData;
+        }
+        function aggregate3(Call3[] calldata calls) external payable returns (Result[] memory returnData);
+    }
+}
+
+/// Multicall3 deployed address (same on all major chains)
+const MULTICALL3_ADDRESS: Address = {
+    Address::new([
+        0xca, 0x11, 0xbd, 0xe0, 0x59, 0x77, 0xb3, 0x63, 0x11, 0x67, 0x02, 0x88, 0x62, 0xbE,
+        0x2a, 0x17, 0x39, 0x76, 0xCA, 0x11,
+    ])
+};
 
 /// The concrete provider type returned by `ProviderBuilder::new().on_http(url)`.
 /// We use a trait-object-based wrapper to avoid spelling out the full generic type.
@@ -129,5 +156,64 @@ impl EthProvider {
     pub async fn get_storage_at(&self, address: Address, slot: U256) -> Result<U256> {
         let value = self.provider.get_storage_at(address, slot).await?;
         Ok(value)
+    }
+
+    /// Execute a raw JSON-RPC request (for trace/debug RPCs).
+    /// Uses raw_request_dyn which works on trait objects (Box<dyn Provider>).
+    pub async fn raw_request(
+        &self,
+        method: &str,
+        params: serde_json::Value,
+    ) -> Result<serde_json::Value> {
+        let params_str = serde_json::to_string(&params)?;
+        let raw_params = serde_json::value::RawValue::from_string(params_str)?;
+        let raw_result = self
+            .provider
+            .raw_request_dyn(method.to_string().into(), &raw_params)
+            .await?;
+        let result: serde_json::Value = serde_json::from_str(raw_result.get())?;
+        Ok(result)
+    }
+
+    /// Execute an eth_call (read-only call to a contract).
+    pub async fn call(&self, to: Address, data: Bytes) -> Result<Bytes> {
+        let tx = alloy::rpc::types::TransactionRequest::default()
+            .to(to)
+            .input(alloy::rpc::types::TransactionInput::new(data));
+        let result = self.provider.call(tx).await?;
+        Ok(result)
+    }
+
+    /// Batch multiple calls via Multicall3.aggregate3.
+    /// Each call is (target_address, calldata). Returns the raw return bytes per call.
+    pub async fn multicall(&self, calls: Vec<(Address, Bytes)>) -> Result<Vec<Bytes>> {
+        let mc_calls: Vec<IMulticall3::Call3> = calls
+            .into_iter()
+            .map(|(target, call_data)| IMulticall3::Call3 {
+                target,
+                allowFailure: true,
+                callData: call_data,
+            })
+            .collect();
+
+        let encoded =
+            Bytes::from(IMulticall3::aggregate3Call { calls: mc_calls }.abi_encode());
+
+        let result_bytes = self.call(MULTICALL3_ADDRESS, encoded).await?;
+
+        let decoded = IMulticall3::aggregate3Call::abi_decode_returns(&result_bytes, false)?;
+        let results: Vec<Bytes> = decoded
+            .returnData
+            .into_iter()
+            .map(|r| {
+                if r.success {
+                    Bytes::from(r.returnData.to_vec())
+                } else {
+                    Bytes::new()
+                }
+            })
+            .collect();
+
+        Ok(results)
     }
 }

@@ -2,7 +2,10 @@ use alloy::dyn_abi::{DynSolValue, JsonAbiExt};
 use alloy::json_abi::JsonAbi;
 use alloy::primitives::{Address, Bytes, B256, U256};
 
-use crate::data::types::{DecodedCall, TokenTransfer};
+// EventExt provides decode_log_parts on json_abi::Event
+use alloy::dyn_abi::EventExt;
+
+use crate::data::types::{DecodedCall, DecodedLog, TokenTransfer};
 
 /// The keccak256 hash of `Transfer(address,address,uint256)`.
 /// This is the topic0 for ERC-20 Transfer events.
@@ -112,6 +115,77 @@ impl TxDecoder {
         }
 
         transfers
+    }
+
+    /// Decode event logs using a known ABI.
+    ///
+    /// For each log, matches topic[0] against all ABI event signatures.
+    /// If matched, decodes indexed params from remaining topics and
+    /// non-indexed params from the log data.
+    pub fn decode_logs(abi: &JsonAbi, logs: &[alloy::rpc::types::Log]) -> Vec<DecodedLog> {
+        let mut decoded = Vec::new();
+
+        for log in logs {
+            let topics = log.inner.data.topics();
+            if topics.is_empty() {
+                continue;
+            }
+
+            let topic0 = topics[0];
+
+            // Try matching against all ABI events
+            for event in abi.events() {
+                let selector = event.selector();
+                if selector != topic0 {
+                    continue;
+                }
+
+                // Try to decode the log using decode_log_parts
+                // topics[1..] are indexed params, log data is non-indexed
+                let remaining_topics = topics[1..].iter().copied();
+                let data = log.inner.data.data.as_ref();
+
+                let params = match event.decode_log_parts(remaining_topics, data, false) {
+                    Ok(decoded_event) => {
+                        // Combine indexed and non-indexed params
+                        let mut params = Vec::new();
+                        let mut indexed_iter = decoded_event.indexed.iter();
+                        let mut body_iter = decoded_event.body.iter();
+
+                        for input in &event.inputs {
+                            let value = if input.indexed {
+                                indexed_iter.next()
+                            } else {
+                                body_iter.next()
+                            };
+
+                            let formatted = value
+                                .map(|v| format_sol_value(v))
+                                .unwrap_or_else(|| "?".to_string());
+
+                            params.push((input.name.clone(), formatted));
+                        }
+
+                        params
+                    }
+                    Err(_) => {
+                        // Could not decode params, but event signature matched
+                        vec![]
+                    }
+                };
+
+                decoded.push(DecodedLog {
+                    address: log.inner.address,
+                    event_name: event.name.clone(),
+                    params,
+                    topic0,
+                });
+
+                break; // Found matching event, no need to check more
+            }
+        }
+
+        decoded
     }
 
     /// Extract the 4-byte method selector from transaction input data.

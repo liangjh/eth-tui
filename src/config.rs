@@ -18,4 +18,12 @@ pub struct Config {
     /// Tick rate in milliseconds for UI refresh
     #[arg(long, default_value = "100")]
     pub tick_rate_ms: u64,
+
+    /// WebSocket RPC endpoint URL for live subscriptions
+    #[arg(long)]
+    pub ws_url: Option<String>,
+
+    /// Chain preset (ethereum, arbitrum, optimism, base, polygon)
+    #[arg(long, default_value = "ethereum")]
+    pub chain: String,
 }

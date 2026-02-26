@@ -10,12 +10,17 @@ use tokio::sync::mpsc;
 use crate::components::address_view::AddressView;
 use crate::components::block_detail::BlockDetailView;
 use crate::components::block_list::BlockList;
+use crate::components::contract_read::ContractRead;
 use crate::components::dashboard::Dashboard;
 use crate::components::gas_tracker::GasTracker;
 use crate::components::header::Header;
 use crate::components::help::HelpOverlay;
+use crate::components::mempool::MempoolView;
 use crate::components::search::SearchBar;
 use crate::components::status_bar::StatusBar;
+use crate::components::storage_inspector::StorageInspector;
+use crate::components::tx_debugger::TxDebugger;
+use crate::components::watch_list::WatchListView;
 use crate::components::Component;
 use crate::data::DataService;
 use crate::events::{AppEvent, View};
@@ -34,6 +39,11 @@ pub struct App {
     tx_detail: crate::components::tx_detail::TxDetailView,
     address_view: AddressView,
     gas_tracker: GasTracker,
+    contract_read: ContractRead,
+    watch_list: WatchListView,
+    mempool: MempoolView,
+    tx_debugger: TxDebugger,
+    storage_inspector: StorageInspector,
     status_bar: StatusBar,
     search_bar: SearchBar,
     help: HelpOverlay,
@@ -63,6 +73,11 @@ impl App {
             tx_detail: crate::components::tx_detail::TxDetailView::new(),
             address_view: AddressView::new(),
             gas_tracker: GasTracker::new(),
+            contract_read: ContractRead::new(),
+            watch_list: WatchListView::new(),
+            mempool: MempoolView::new(),
+            tx_debugger: TxDebugger::new(),
+            storage_inspector: StorageInspector::new(),
             status_bar: StatusBar::new(),
             search_bar: SearchBar::new(),
             help: HelpOverlay::new(),
@@ -71,6 +86,11 @@ impl App {
             should_quit: false,
             tick_rate: Duration::from_millis(tick_rate_ms),
         }
+    }
+
+    pub fn set_chain_info(&mut self, name: String, symbol: String) {
+        self.header.chain_name = name;
+        self.header.native_symbol = symbol;
     }
 
     pub async fn run(&mut self, mut terminal: ratatui::DefaultTerminal) -> color_eyre::Result<()> {
@@ -129,6 +149,11 @@ impl App {
             View::TransactionDetail(_) => self.tx_detail.render(frame, chunks[1]),
             View::AddressView(_) => self.address_view.render(frame, chunks[1]),
             View::GasTracker => self.gas_tracker.render(frame, chunks[1]),
+            View::WatchList => self.watch_list.render(frame, chunks[1]),
+            View::Mempool => self.mempool.render(frame, chunks[1]),
+            View::TxDebugger(_) => self.tx_debugger.render(frame, chunks[1]),
+            View::ContractRead(_) => self.contract_read.render(frame, chunks[1]),
+            View::StorageInspector(_) => self.storage_inspector.render(frame, chunks[1]),
         }
 
         // Status bar
@@ -193,6 +218,37 @@ impl App {
                     self.navigate_to(View::GasTracker);
                     return;
                 }
+                KeyCode::Char('4') => {
+                    self.navigate_to(View::WatchList);
+                    return;
+                }
+                KeyCode::Char('5') => {
+                    self.navigate_to(View::Mempool);
+                    return;
+                }
+                KeyCode::Char('e') => {
+                    // Export current view data
+                    let export_event = match &self.current_view {
+                        View::BlockDetail(n) => {
+                            if let Some(ref detail) = self.block_detail.detail {
+                                Some(format!("block_{}", detail.summary.number))
+                            } else {
+                                Some(format!("block_{n}"))
+                            }
+                        }
+                        View::TransactionDetail(hash) => {
+                            Some(format!("tx_{hash}"))
+                        }
+                        View::AddressView(addr) => {
+                            Some(format!("address_{addr}"))
+                        }
+                        _ => None,
+                    };
+                    if let Some(name) = export_event {
+                        self.status_bar.error_message = Some(format!("Exporting {name}..."));
+                    }
+                    return;
+                }
                 KeyCode::Esc | KeyCode::Backspace => {
                     self.go_back();
                     return;
@@ -208,6 +264,11 @@ impl App {
                 View::TransactionDetail(_) => self.tx_detail.handle_key(key),
                 View::AddressView(_) => self.address_view.handle_key(key),
                 View::GasTracker => self.gas_tracker.handle_key(key),
+                View::WatchList => self.watch_list.handle_key(key),
+                View::Mempool => self.mempool.handle_key(key),
+                View::TxDebugger(_) => self.tx_debugger.handle_key(key),
+                View::ContractRead(_) => self.contract_read.handle_key(key),
+                View::StorageInspector(_) => self.storage_inspector.handle_key(key),
             };
 
             if let Some(event) = app_event {
@@ -289,6 +350,68 @@ impl App {
                 self.status_bar.error_message = Some(msg);
                 self.status_bar.loading = false;
             }
+            // New feature events - will be fully implemented by agents
+            AppEvent::EnsResolved { address, .. } => {
+                self.search_bar.deactivate();
+                self.navigate_to(View::AddressView(address));
+            }
+            AppEvent::EnsNotFound(msg) => {
+                self.status_bar.loading = false;
+                self.search_bar.error = Some(msg.clone());
+                self.status_bar.error_message = Some(msg);
+            }
+            AppEvent::TokenMetadataLoaded(_meta) => {
+                // Agent D will update tx_detail with token metadata
+            }
+            AppEvent::InternalTransactionsLoaded { calls, .. } => {
+                self.tx_detail.internal_calls = calls;
+            }
+            AppEvent::DecodedLogsLoaded { logs, .. } => {
+                self.tx_detail.decoded_logs = logs;
+            }
+            AppEvent::ContractReadResult { result, .. } => {
+                self.contract_read.loading = false;
+                // Agent C will handle result display
+                let _ = result;
+            }
+            AppEvent::WatchListUpdated(entries) => {
+                self.watch_list.entries = entries;
+            }
+            AppEvent::PendingTransactions(txs) => {
+                self.mempool.pending_txs = txs;
+            }
+            AppEvent::WsConnected => {
+                self.mempool.connected = true;
+                self.status_bar.ws_connected = true;
+            }
+            AppEvent::WsDisconnected => {
+                self.mempool.connected = false;
+                self.status_bar.ws_connected = false;
+            }
+            AppEvent::NewBlock(block) => {
+                // Add to dashboard blocks
+                self.dashboard.blocks.insert(0, block);
+                if self.dashboard.blocks.len() > 20 {
+                    self.dashboard.blocks.truncate(20);
+                }
+            }
+            AppEvent::NewPendingTx(tx) => {
+                self.mempool.pending_txs.insert(0, tx);
+                if self.mempool.pending_txs.len() > 100 {
+                    self.mempool.pending_txs.truncate(100);
+                }
+            }
+            AppEvent::TraceLoaded { trace, .. } => {
+                self.tx_debugger.trace = Some(trace);
+                self.tx_debugger.loading = false;
+            }
+            AppEvent::StorageValueLoaded { slot, value, .. } => {
+                self.storage_inspector.results.push((slot, value));
+                self.storage_inspector.loading = false;
+            }
+            AppEvent::ExportComplete(path) => {
+                self.status_bar.error_message = Some(format!("Exported to {path}"));
+            }
         }
     }
 
@@ -298,7 +421,9 @@ impl App {
             View::Dashboard => self.header.current_tab = 0,
             View::BlockList | View::BlockDetail(_) => self.header.current_tab = 1,
             View::GasTracker => self.header.current_tab = 2,
-            _ => {} // Keep current tab for tx/address detail views
+            View::WatchList => self.header.current_tab = 3,
+            View::Mempool => self.header.current_tab = 4,
+            _ => {} // Keep current tab for detail views
         }
 
         // Clear error on navigation
@@ -343,6 +468,25 @@ impl App {
                     self.data_service.fetch_gas_info();
                 }
             }
+            View::WatchList => {
+                // Agents will load watch list data
+            }
+            View::Mempool => {
+                // Requires WebSocket - agents will handle
+            }
+            View::TxDebugger(hash) => {
+                self.tx_debugger.trace = None;
+                self.tx_debugger.loading = true;
+                self.status_bar.loading = true;
+                self.data_service.fetch_internal_transactions(*hash);
+            }
+            View::ContractRead(address) => {
+                self.contract_read.address = Some(*address);
+                self.contract_read.loading = true;
+            }
+            View::StorageInspector(address) => {
+                self.storage_inspector.address = Some(*address);
+            }
         }
     }
 
@@ -353,6 +497,8 @@ impl App {
                 View::Dashboard => self.header.current_tab = 0,
                 View::BlockList | View::BlockDetail(_) => self.header.current_tab = 1,
                 View::GasTracker => self.header.current_tab = 2,
+                View::WatchList => self.header.current_tab = 3,
+                View::Mempool => self.header.current_tab = 4,
                 _ => {}
             }
             self.status_bar.error_message = None;

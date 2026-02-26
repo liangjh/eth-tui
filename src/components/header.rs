@@ -9,9 +9,11 @@ pub struct Header {
     pub latest_block: u64,
     pub current_tab: usize,
     pub connected: bool,
+    pub chain_name: String,
+    pub native_symbol: String,
 }
 
-const TABS: &[&str] = &["Dashboard", "Blocks", "Gas Tracker"];
+const TABS: &[&str] = &["Dashboard [1]", "Blocks [2]", "Gas [3]", "Watch [4]", "Mempool [5]"];
 
 impl Header {
     pub fn new() -> Self {
@@ -20,15 +22,24 @@ impl Header {
             latest_block: 0,
             current_tab: 0,
             connected: false,
+            chain_name: String::new(),
+            native_symbol: "ETH".to_string(),
         }
     }
 
-    fn chain_name(&self) -> String {
+    fn display_chain_name(&self) -> &str {
+        if !self.chain_name.is_empty() {
+            return &self.chain_name;
+        }
         match self.chain_id {
-            1 => "Mainnet".to_string(),
-            5 => "Goerli".to_string(),
-            11155111 => "Sepolia".to_string(),
-            other => format!("Chain {other}"),
+            1 => "Mainnet",
+            5 => "Goerli",
+            11155111 => "Sepolia",
+            10 => "Optimism",
+            42161 => "Arbitrum",
+            8453 => "Base",
+            137 => "Polygon",
+            _ => "Unknown",
         }
     }
 
@@ -69,7 +80,7 @@ impl Header {
         // Right: Network info and block number
         let block_str = utils::format_number(self.latest_block);
         let network_info = Line::from(vec![
-            Span::styled(self.chain_name(), Style::default().fg(THEME.text)),
+            Span::styled(self.display_chain_name(), Style::default().fg(THEME.text)),
             Span::styled(" | ", THEME.muted_style()),
             Span::styled(format!("#{block_str}"), THEME.accent_style()),
         ]);

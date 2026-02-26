@@ -1,7 +1,8 @@
-use alloy::primitives::{Address, B256};
+use alloy::primitives::{Address, B256, U256};
 
 use crate::data::types::{
-    AddressInfo, BlockDetail, BlockSummary, GasInfo, TransactionDetail, TransactionSummary,
+    AddressInfo, BlockDetail, BlockSummary, DecodedLog, ExecutionTrace, GasInfo, InternalCall,
+    TokenMetadata, TransactionDetail, TransactionSummary, WatchEntry,
 };
 
 /// Views the user can navigate to
@@ -13,6 +14,11 @@ pub enum View {
     TransactionDetail(B256),
     AddressView(Address),
     GasTracker,
+    WatchList,
+    Mempool,
+    TxDebugger(B256),
+    ContractRead(Address),
+    StorageInspector(Address),
 }
 
 /// Target identified from a search query
@@ -22,11 +28,17 @@ pub enum SearchTarget {
     TransactionHash(B256),
     BlockNumber(u64),
     BlockHash(B256),
+    EnsName(String),
 }
 
 impl SearchTarget {
     pub fn parse(input: &str) -> Option<SearchTarget> {
         let input = input.trim();
+
+        // ENS name (ends with .eth)
+        if input.ends_with(".eth") && input.len() > 4 {
+            return Some(SearchTarget::EnsName(input.to_string()));
+        }
 
         // 0x-prefixed, 66 chars = tx hash or block hash
         if input.starts_with("0x") && input.len() == 66 {
@@ -117,6 +129,41 @@ pub enum AppEvent {
     TransactionDetailLoaded(Box<TransactionDetail>),
     AddressInfoLoaded(Box<AddressInfo>),
     GasInfoLoaded(GasInfo),
+
+    // ENS
+    EnsResolved { name: String, address: Address },
+    EnsNotFound(String),
+
+    // Token metadata
+    TokenMetadataLoaded(TokenMetadata),
+
+    // Internal transactions
+    InternalTransactionsLoaded { tx_hash: B256, calls: Vec<InternalCall> },
+
+    // Event logs decoded
+    DecodedLogsLoaded { tx_hash: B256, logs: Vec<DecodedLog> },
+
+    // Contract read
+    ContractReadResult { address: Address, function: String, result: String },
+
+    // Watch list
+    WatchListUpdated(Vec<WatchEntry>),
+
+    // Mempool / WebSocket
+    PendingTransactions(Vec<TransactionSummary>),
+    WsConnected,
+    WsDisconnected,
+    NewBlock(BlockSummary),
+    NewPendingTx(TransactionSummary),
+
+    // Tx debugger
+    TraceLoaded { tx_hash: B256, trace: ExecutionTrace },
+
+    // Storage
+    StorageValueLoaded { address: Address, slot: U256, value: B256 },
+
+    // Export
+    ExportComplete(String),
 
     // Search
     SearchResult(SearchTarget),

@@ -1,4 +1,5 @@
 use alloy::primitives::{Address, Bytes, B256, U256};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone)]
 pub struct BlockSummary {
@@ -10,6 +11,7 @@ pub struct BlockSummary {
     pub gas_limit: u64,
     pub base_fee: Option<u128>,
     pub miner: Address,
+    pub eth_burned: Option<U256>,
 }
 
 #[derive(Debug, Clone)]
@@ -185,4 +187,69 @@ pub struct GasInfo {
     pub base_fee: u128,
     pub blob_base_fee: Option<u128>,
     pub history: Vec<u128>,
+    pub priority_fee_percentiles: Vec<(u8, u128)>,
+    pub is_congested: bool,
+}
+
+#[derive(Debug, Clone)]
+pub struct InternalCall {
+    pub from: Address,
+    pub to: Address,
+    pub value: U256,
+    pub call_type: String,
+    pub gas_used: u64,
+    pub input: Bytes,
+    pub output: Bytes,
+    pub depth: usize,
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct DecodedLog {
+    pub address: Address,
+    pub event_name: String,
+    pub params: Vec<(String, String)>,
+    pub topic0: B256,
+}
+
+#[derive(Debug, Clone)]
+pub struct ExecutionTrace {
+    pub steps: Vec<TraceStep>,
+    pub gas_used: u64,
+}
+
+#[derive(Debug, Clone)]
+pub struct TraceStep {
+    pub pc: u64,
+    pub op: String,
+    pub gas: u64,
+    pub gas_cost: u64,
+    pub depth: usize,
+    pub stack: Vec<U256>,
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WatchEntry {
+    pub address: Address,
+    pub label: String,
+    pub added_at: u64,
+}
+
+#[derive(Debug, Clone)]
+pub struct ChainConfig {
+    pub name: String,
+    pub chain_id: u64,
+    pub rpc_url: String,
+    pub symbol: String,
+    pub explorer_url: Option<String>,
+    pub explorer_api_key: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct TokenMetadata {
+    pub address: Address,
+    pub name: String,
+    pub symbol: String,
+    pub decimals: u8,
 }

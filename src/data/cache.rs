@@ -11,12 +11,14 @@ const BLOCK_TTL: Duration = Duration::from_secs(3600); // blocks are immutable, 
 const TX_TTL: Duration = Duration::from_secs(3600); // transactions are immutable
 const BALANCE_TTL: Duration = Duration::from_secs(30); // balances change often
 const GAS_TTL: Duration = Duration::from_secs(12); // roughly one block
+const TOKEN_METADATA_TTL: Duration = Duration::from_secs(3600); // token metadata rarely changes
 
 /// Cache sizes for each data type.
 const BLOCK_CACHE_SIZE: usize = 500;
 const BLOCK_DETAIL_CACHE_SIZE: usize = 100;
 const TX_CACHE_SIZE: usize = 500;
 const BALANCE_CACHE_SIZE: usize = 200;
+const TOKEN_METADATA_CACHE_SIZE: usize = 500;
 
 pub struct DataCache {
     blocks: LruCache<u64, (Instant, BlockSummary)>,
@@ -24,6 +26,7 @@ pub struct DataCache {
     transactions: LruCache<B256, (Instant, TransactionDetail)>,
     balances: LruCache<Address, (Instant, U256)>,
     gas_info: Option<(Instant, GasInfo)>,
+    token_metadata: LruCache<Address, (Instant, TokenMetadata)>,
 }
 
 impl DataCache {
@@ -34,6 +37,7 @@ impl DataCache {
             transactions: LruCache::new(NonZeroUsize::new(TX_CACHE_SIZE).unwrap()),
             balances: LruCache::new(NonZeroUsize::new(BALANCE_CACHE_SIZE).unwrap()),
             gas_info: None,
+            token_metadata: LruCache::new(NonZeroUsize::new(TOKEN_METADATA_CACHE_SIZE).unwrap()),
         }
     }
 
@@ -119,6 +123,24 @@ impl DataCache {
         self.gas_info = Some((Instant::now(), info));
     }
 
+    // --- Token Metadata ---
+
+    /// Get cached token metadata. Returns None if expired or missing.
+    pub fn get_token_metadata(&mut self, address: Address) -> Option<TokenMetadata> {
+        let entry = self.token_metadata.get(&address)?;
+        if entry.0.elapsed() < TOKEN_METADATA_TTL {
+            Some(entry.1.clone())
+        } else {
+            self.token_metadata.pop(&address);
+            None
+        }
+    }
+
+    /// Cache token metadata with automatic TTL.
+    pub fn put_token_metadata(&mut self, address: Address, metadata: TokenMetadata) {
+        self.token_metadata.put(address, (Instant::now(), metadata));
+    }
+
     /// Evict all cached data. Useful when switching chains or reconnecting.
     pub fn clear(&mut self) {
         self.blocks.clear();
@@ -126,6 +148,7 @@ impl DataCache {
         self.transactions.clear();
         self.balances.clear();
         self.gas_info = None;
+        self.token_metadata.clear();
     }
 }
 
@@ -149,6 +172,7 @@ mod tests {
             gas_limit: 30_000_000,
             base_fee: Some(30_000_000_000),
             miner: Address::ZERO,
+            eth_burned: None,
         }
     }
 
@@ -160,6 +184,17 @@ mod tests {
             base_fee: 15_000_000_000,
             blob_base_fee: None,
             history: vec![10, 20, 30],
+            priority_fee_percentiles: vec![],
+            is_congested: false,
+        }
+    }
+
+    fn make_token_metadata(address: Address) -> TokenMetadata {
+        TokenMetadata {
+            address,
+            name: "Test Token".to_string(),
+            symbol: "TST".to_string(),
+            decimals: 18,
         }
     }
 
@@ -219,17 +254,41 @@ mod tests {
     }
 
     #[test]
+    fn test_put_and_get_token_metadata() {
+        let mut cache = DataCache::new();
+        let addr = Address::from_slice(&[0x01; 20]);
+        let metadata = make_token_metadata(addr);
+
+        cache.put_token_metadata(addr, metadata.clone());
+        let cached = cache.get_token_metadata(addr);
+        assert!(cached.is_some());
+        let cached = cached.unwrap();
+        assert_eq!(cached.name, "Test Token");
+        assert_eq!(cached.symbol, "TST");
+        assert_eq!(cached.decimals, 18);
+    }
+
+    #[test]
+    fn test_get_missing_token_metadata() {
+        let mut cache = DataCache::new();
+        let addr = Address::from_slice(&[0x99; 20]);
+        assert!(cache.get_token_metadata(addr).is_none());
+    }
+
+    #[test]
     fn test_clear_empties_all_caches() {
         let mut cache = DataCache::new();
         cache.put_block(1, make_block_summary(1));
         cache.put_balance(Address::ZERO, U256::from(100u64));
         cache.put_gas_info(make_gas_info());
+        cache.put_token_metadata(Address::ZERO, make_token_metadata(Address::ZERO));
 
         cache.clear();
 
         assert!(cache.get_block(1).is_none());
         assert!(cache.get_balance(Address::ZERO).is_none());
         assert!(cache.get_gas_info().is_none());
+        assert!(cache.get_token_metadata(Address::ZERO).is_none());
     }
 
     #[test]

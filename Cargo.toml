@@ -12,12 +12,16 @@ crossterm = { version = "0.28", features = ["event-stream"] }
 alloy = { version = "0.12", features = [
     "providers",
     "provider-http",
+    "provider-ws",
     "rpc-types",
     "rpc-types-trace",
     "json-abi",
     "dyn-abi",
+    "sol-types",
     "transports",
     "transport-http",
+    "transport-ws",
+    "pubsub",
 ] }
 
 # Async
@@ -34,3 +38,5 @@ chrono = "0.4"
 color-eyre = "0.6"
 lru = "0.12"
 clap = { version = "4", features = ["derive", "env"] }
+csv = "1"
+dirs = "5"

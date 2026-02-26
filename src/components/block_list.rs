@@ -63,6 +63,21 @@ impl BlockList {
     }
 }
 
+fn format_burned_compact(eth_burned: &Option<alloy::primitives::U256>) -> String {
+    match eth_burned {
+        Some(burned) if !burned.is_zero() => {
+            let eth_str = utils::format_u256_as_decimal(*burned, 18);
+            // Truncate to keep it compact
+            if eth_str.len() > 8 {
+                format!("{} E", &eth_str[..8])
+            } else {
+                format!("{eth_str} E")
+            }
+        }
+        _ => "-".to_string(),
+    }
+}
+
 fn build_rows(blocks: &[BlockSummary]) -> Vec<Row<'static>> {
     blocks
         .iter()
@@ -81,6 +96,7 @@ fn build_rows(blocks: &[BlockSummary]) -> Vec<Row<'static>> {
                 Cell::from(utils::format_number(b.gas_used)),
                 Cell::from(format!("{:.1}%", gas_pct)).style(THEME.gas_style(gas_pct)),
                 Cell::from(base_fee_str),
+                Cell::from(format_burned_compact(&b.eth_burned)).style(THEME.eth_style()),
                 Cell::from(utils::truncate_address(&b.miner)).style(THEME.address_style()),
             ])
         })
@@ -133,6 +149,7 @@ impl Component for BlockList {
             Cell::from("Gas Used"),
             Cell::from("Gas %"),
             Cell::from("Base Fee"),
+            Cell::from("Burned"),
             Cell::from("Miner"),
         ])
         .style(THEME.table_header_style())
@@ -146,6 +163,7 @@ impl Component for BlockList {
             Constraint::Length(6),
             Constraint::Length(14),
             Constraint::Length(8),
+            Constraint::Length(12),
             Constraint::Length(12),
             Constraint::Min(14),
         ];

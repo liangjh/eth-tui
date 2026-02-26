@@ -216,6 +216,28 @@ impl Component for AddressView {
                 }
                 None
             }
+            KeyCode::Char('r') => {
+                // Navigate to Contract Read view if this is a contract
+                if let Some(info) = &self.info {
+                    if info.is_contract {
+                        return Some(AppEvent::Navigate(View::ContractRead(info.address)));
+                    }
+                }
+                None
+            }
+            KeyCode::Char('S') => {
+                // Navigate to Storage Inspector if this is a contract
+                if let Some(info) = &self.info {
+                    if info.is_contract {
+                        return Some(AppEvent::Navigate(View::StorageInspector(info.address)));
+                    }
+                }
+                None
+            }
+            KeyCode::Char('w') => {
+                // Add to watch list (navigate to watch list for now)
+                Some(AppEvent::Navigate(View::WatchList))
+            }
             _ => None,
         }
     }
