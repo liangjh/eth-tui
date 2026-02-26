@@ -128,3 +128,135 @@ mod hex {
         bytes.iter().map(|b| format!("{b:02x}")).collect()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_format_number() {
+        assert_eq!(format_number(0), "0");
+        assert_eq!(format_number(1), "1");
+        assert_eq!(format_number(999), "999");
+        assert_eq!(format_number(1000), "1,000");
+        assert_eq!(format_number(1_000_000), "1,000,000");
+        assert_eq!(format_number(12_345_678), "12,345,678");
+        assert_eq!(format_number(999_999_999), "999,999,999");
+    }
+
+    #[test]
+    fn test_truncate_hash() {
+        let hash: B256 = "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890"
+            .parse()
+            .unwrap();
+        let truncated = truncate_hash(&hash);
+        assert!(truncated.starts_with("0xabcdef"));
+        assert!(truncated.contains("..."));
+        assert!(truncated.ends_with("7890"));
+    }
+
+    #[test]
+    fn test_truncate_address() {
+        let addr: Address = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045"
+            .parse()
+            .unwrap();
+        let truncated = truncate_address(&addr);
+        assert!(truncated.starts_with("0x"));
+        assert!(truncated.contains("..."));
+        assert_eq!(truncated.len(), 15); // "0xabcd...ef12" = 8 + 3 + 4
+    }
+
+    #[test]
+    fn test_format_eth_zero() {
+        assert_eq!(format_eth(U256::ZERO), "0.0 ETH");
+    }
+
+    #[test]
+    fn test_format_eth_one() {
+        let one_eth = U256::from(10u64).pow(U256::from(18));
+        assert_eq!(format_eth(one_eth), "1.0 ETH");
+    }
+
+    #[test]
+    fn test_format_eth_fractional() {
+        // 1.5 ETH = 1_500_000_000_000_000_000
+        let wei = U256::from(1_500_000_000_000_000_000u64);
+        assert_eq!(format_eth(wei), "1.5 ETH");
+    }
+
+    #[test]
+    fn test_format_u256_as_decimal_zero() {
+        assert_eq!(format_u256_as_decimal(U256::ZERO, 18), "0.0");
+    }
+
+    #[test]
+    fn test_format_u256_as_decimal_whole() {
+        let val = U256::from(10u64).pow(U256::from(18));
+        assert_eq!(format_u256_as_decimal(val, 18), "1.0");
+    }
+
+    #[test]
+    fn test_format_u256_as_decimal_with_remainder() {
+        // 0.123456 with 6 decimals = 123456
+        let val = U256::from(123456u64);
+        assert_eq!(format_u256_as_decimal(val, 6), "0.123456");
+    }
+
+    #[test]
+    fn test_format_gwei_small() {
+        let result = format_gwei(100_000); // 0.0001 Gwei
+        assert!(result.contains("Gwei"));
+        assert!(result.starts_with("0.0001"));
+    }
+
+    #[test]
+    fn test_format_gwei_normal() {
+        let result = format_gwei(30_000_000_000); // 30 Gwei
+        assert_eq!(result, "30.0 Gwei");
+    }
+
+    #[test]
+    fn test_format_gwei_medium() {
+        let result = format_gwei(5_500_000_000); // 5.5 Gwei
+        assert_eq!(result, "5.50 Gwei");
+    }
+
+    #[test]
+    fn test_format_gas_usage() {
+        assert_eq!(format_gas_usage(15_000_000, 30_000_000), "15,000,000 (50.0%)");
+        assert_eq!(format_gas_usage(0, 30_000_000), "0 (0.0%)");
+    }
+
+    #[test]
+    fn test_format_gas_usage_zero_limit() {
+        assert_eq!(format_gas_usage(100, 0), "100 (0.0%)");
+    }
+
+    #[test]
+    fn test_gas_utilization_pct() {
+        assert_eq!(gas_utilization_pct(0, 100), 0.0);
+        assert_eq!(gas_utilization_pct(50, 100), 50.0);
+        assert_eq!(gas_utilization_pct(100, 100), 100.0);
+        assert_eq!(gas_utilization_pct(100, 0), 0.0); // zero limit edge case
+    }
+
+    #[test]
+    fn test_format_timestamp() {
+        // Unix epoch
+        assert_eq!(format_timestamp(0), "Jan 01, 1970 00:00:00 UTC");
+        // Known timestamp: 2024-01-01 00:00:00 UTC = 1704067200
+        assert_eq!(format_timestamp(1704067200), "Jan 01, 2024 00:00:00 UTC");
+    }
+
+    #[test]
+    fn test_format_selector() {
+        let selector = [0xa9, 0x05, 0x9c, 0xbb]; // transfer(address,uint256)
+        assert_eq!(format_selector(&selector), "0xa9059cbb");
+    }
+
+    #[test]
+    fn test_format_selector_zeros() {
+        let selector = [0x00, 0x00, 0x00, 0x00];
+        assert_eq!(format_selector(&selector), "0x00000000");
+    }
+}

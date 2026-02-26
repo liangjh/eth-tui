@@ -134,3 +134,134 @@ impl Default for DataCache {
         Self::new()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn make_block_summary(number: u64) -> BlockSummary {
+        BlockSummary {
+            number,
+            hash: B256::ZERO,
+            timestamp: 1700000000,
+            tx_count: 100,
+            gas_used: 15_000_000,
+            gas_limit: 30_000_000,
+            base_fee: Some(30_000_000_000),
+            miner: Address::ZERO,
+        }
+    }
+
+    fn make_gas_info() -> GasInfo {
+        GasInfo {
+            slow: 10_000_000_000,
+            standard: 20_000_000_000,
+            fast: 40_000_000_000,
+            base_fee: 15_000_000_000,
+            blob_base_fee: None,
+            history: vec![10, 20, 30],
+        }
+    }
+
+    #[test]
+    fn test_put_and_get_block() {
+        let mut cache = DataCache::new();
+        let block = make_block_summary(100);
+        cache.put_block(100, block.clone());
+
+        let cached = cache.get_block(100);
+        assert!(cached.is_some());
+        assert_eq!(cached.unwrap().number, 100);
+    }
+
+    #[test]
+    fn test_get_missing_block() {
+        let mut cache = DataCache::new();
+        assert!(cache.get_block(999).is_none());
+    }
+
+    #[test]
+    fn test_put_and_get_balance() {
+        let mut cache = DataCache::new();
+        let addr = Address::from_slice(&[0x01; 20]);
+        let balance = U256::from(1_000_000u64);
+
+        cache.put_balance(addr, balance);
+        let cached = cache.get_balance(addr);
+        assert_eq!(cached, Some(balance));
+    }
+
+    #[test]
+    fn test_get_missing_balance() {
+        let mut cache = DataCache::new();
+        let addr = Address::from_slice(&[0x99; 20]);
+        assert!(cache.get_balance(addr).is_none());
+    }
+
+    #[test]
+    fn test_put_and_get_gas_info() {
+        let mut cache = DataCache::new();
+        let gas = make_gas_info();
+        cache.put_gas_info(gas);
+
+        let cached = cache.get_gas_info();
+        assert!(cached.is_some());
+        let info = cached.unwrap();
+        assert_eq!(info.slow, 10_000_000_000);
+        assert_eq!(info.standard, 20_000_000_000);
+        assert_eq!(info.fast, 40_000_000_000);
+    }
+
+    #[test]
+    fn test_gas_info_initially_none() {
+        let cache = DataCache::new();
+        assert!(cache.get_gas_info().is_none());
+    }
+
+    #[test]
+    fn test_clear_empties_all_caches() {
+        let mut cache = DataCache::new();
+        cache.put_block(1, make_block_summary(1));
+        cache.put_balance(Address::ZERO, U256::from(100u64));
+        cache.put_gas_info(make_gas_info());
+
+        cache.clear();
+
+        assert!(cache.get_block(1).is_none());
+        assert!(cache.get_balance(Address::ZERO).is_none());
+        assert!(cache.get_gas_info().is_none());
+    }
+
+    #[test]
+    fn test_lru_eviction() {
+        // Create a cache and fill blocks beyond capacity to test LRU eviction
+        let mut cache = DataCache::new();
+        // BLOCK_CACHE_SIZE is 500, fill 501
+        for i in 0..=BLOCK_CACHE_SIZE as u64 {
+            cache.put_block(i, make_block_summary(i));
+        }
+        // Block 0 should have been evicted (it was the least recently used)
+        assert!(cache.get_block(0).is_none());
+        // Most recent block should still be present
+        assert!(cache.get_block(BLOCK_CACHE_SIZE as u64).is_some());
+    }
+
+    #[test]
+    fn test_overwrite_existing_key() {
+        let mut cache = DataCache::new();
+        cache.put_block(1, make_block_summary(1));
+
+        let mut updated = make_block_summary(1);
+        updated.tx_count = 999;
+        cache.put_block(1, updated);
+
+        let cached = cache.get_block(1).unwrap();
+        assert_eq!(cached.tx_count, 999);
+    }
+
+    #[test]
+    fn test_default_trait() {
+        let cache = DataCache::default();
+        assert!(cache.gas_info.is_none());
+    }
+}

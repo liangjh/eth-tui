@@ -518,7 +518,7 @@ impl DataService {
 // --- Conversion helpers ---
 
 /// Convert an alloy `Block` to our `BlockSummary`.
-fn block_to_summary(block: &Block) -> BlockSummary {
+pub(crate) fn block_to_summary(block: &Block) -> BlockSummary {
     let tx_count = block
         .transactions
         .as_transactions()
@@ -544,7 +544,7 @@ fn block_to_summary(block: &Block) -> BlockSummary {
 }
 
 /// Convert an alloy `Transaction` (with optional receipt) to our `TransactionSummary`.
-fn tx_to_summary(
+pub(crate) fn tx_to_summary(
     tx: &Transaction,
     receipt: Option<&TransactionReceipt>,
     block_timestamp: u64,

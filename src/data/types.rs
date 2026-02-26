@@ -148,6 +148,35 @@ impl std::fmt::Display for ContractType {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_tx_type_display() {
+        assert_eq!(TxType::Legacy.to_string(), "Legacy (Type 0)");
+        assert_eq!(TxType::EIP2930.to_string(), "EIP-2930 (Type 1)");
+        assert_eq!(TxType::EIP1559.to_string(), "EIP-1559 (Type 2)");
+        assert_eq!(TxType::EIP4844.to_string(), "EIP-4844 (Type 3)");
+        assert_eq!(TxType::ContractCreation.to_string(), "Contract Creation");
+    }
+
+    #[test]
+    fn test_tx_status_display() {
+        assert_eq!(TxStatus::Success.to_string(), "Success");
+        assert_eq!(TxStatus::Failed.to_string(), "Failed");
+        assert_eq!(TxStatus::Pending.to_string(), "Pending");
+    }
+
+    #[test]
+    fn test_contract_type_display() {
+        assert_eq!(ContractType::ERC20.to_string(), "ERC-20");
+        assert_eq!(ContractType::ERC721.to_string(), "ERC-721");
+        assert_eq!(ContractType::ERC1155.to_string(), "ERC-1155");
+        assert_eq!(ContractType::Unknown.to_string(), "Contract");
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct GasInfo {
     pub slow: u128,

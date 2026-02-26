@@ -51,6 +51,61 @@ impl SearchTarget {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_address() {
+        let input = "0xd8dA6BF26964aF9D7eEd9e03E53415D37aA96045";
+        let result = SearchTarget::parse(input);
+        assert!(matches!(result, Some(SearchTarget::Address(_))));
+    }
+
+    #[test]
+    fn test_parse_tx_hash() {
+        let input = "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890";
+        let result = SearchTarget::parse(input);
+        assert!(matches!(result, Some(SearchTarget::TransactionHash(_))));
+    }
+
+    #[test]
+    fn test_parse_block_number() {
+        let result = SearchTarget::parse("19234567");
+        assert!(matches!(result, Some(SearchTarget::BlockNumber(19234567))));
+    }
+
+    #[test]
+    fn test_parse_block_zero() {
+        let result = SearchTarget::parse("0");
+        assert!(matches!(result, Some(SearchTarget::BlockNumber(0))));
+    }
+
+    #[test]
+    fn test_parse_empty() {
+        assert!(SearchTarget::parse("").is_none());
+    }
+
+    #[test]
+    fn test_parse_invalid() {
+        assert!(SearchTarget::parse("hello world").is_none());
+        assert!(SearchTarget::parse("0x").is_none());
+        assert!(SearchTarget::parse("0xZZZZ").is_none());
+    }
+
+    #[test]
+    fn test_parse_whitespace_trimming() {
+        let result = SearchTarget::parse("  19234567  ");
+        assert!(matches!(result, Some(SearchTarget::BlockNumber(19234567))));
+    }
+
+    #[test]
+    fn test_parse_short_hex_not_address() {
+        // 0x-prefixed but not 42 chars and not 66 chars
+        assert!(SearchTarget::parse("0xabcdef").is_none());
+    }
+}
+
 /// Events sent from background data tasks to the main app loop
 #[derive(Debug)]
 pub enum AppEvent {
